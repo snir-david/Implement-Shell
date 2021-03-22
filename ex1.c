@@ -6,9 +6,10 @@
 #include <sys/wait.h>
 
 typedef struct jobRec {
-    char *jobName;
+    char jobName[100];
     char *status;
     int background;
+    pid_t pid;
 };
 
 int splitString(char **jobs, char *input) {
@@ -25,7 +26,7 @@ int splitString(char **jobs, char *input) {
 }
 
 void jobs(struct jobRec history[100], int commandNumber) {
-    for (int i = 0; i < commandNumber; ++i) {
+    for (int i = 0; i <= commandNumber; ++i) {
         if (history[i].background && strcmp(history[i].status, "RUNNING") == 0) {
             printf("%s\n", history[i].jobName);
         }
@@ -33,7 +34,8 @@ void jobs(struct jobRec history[100], int commandNumber) {
 }
 
 void historyComm(struct jobRec history[100], int commandNumber) {
-    for (int i = 0; i < commandNumber; ++i) {
+    //printing all jobs and status
+    for (int i = 0; i <= commandNumber; ++i) {
         printf("%s %s\n", history[i].jobName, history[i].status);
     }
 }
@@ -46,6 +48,7 @@ void exitShell() {
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "EndlessLoop"
+
 int main() {
     //initialize variables
     int commandNumber = 0;
@@ -53,7 +56,7 @@ int main() {
     char *builtInFunc[] = {"jobs", "history", "cd", "exit"};
     int status, commandLen;
     pid_t pid;
-    struct jobRec jobRecord, history[100];
+    struct jobRec history[100];
 
     //shell loop
     while (1) {
@@ -67,11 +70,10 @@ int main() {
         //splitting command into tokens and getting back input len
         commandLen = splitString(currentJob, input);
         //setting jobRecord struct
-        jobRecord.jobName = input;
-        jobRecord.status = "RUNNING";
-        jobRecord.background = 0;
+        strcpy(history[commandNumber].jobName, input);
+        history[commandNumber].status = "RUNNING";
+        history[commandNumber].background = 0;
         //insert command into history
-        history[commandNumber] = jobRecord;
         //checking if it is one of the built in functions
         for (int j = 0; j < 4; ++j) {
             if (strcmp(currentJob[0], builtInFunc[j]) == 0) {
@@ -80,14 +82,18 @@ int main() {
                     //jumping to case according to the j that entered to the condition
                     case 0:
                         jobs(history, commandNumber);
+                        break;
                     case 1:
                         historyComm(history, commandNumber);
+                        break;
                     case 2:
                         cd();
+                        break;
                     case 3:
                         exitShell();
+                        break;
                     default:
-                        continue;
+                        break;
                 }
             }
         }
@@ -100,10 +106,11 @@ int main() {
                 fflush(stdout);
             }
             if (pid == 0) {
+                //getting pid to struct
+                history[commandNumber].pid = getpid();
                 //child - adding null to args for execvp
                 if (strcmp(currentJob[commandLen], "&") == 0) {
                     currentJob[commandLen] = NULL;
-                    history[commandNumber].background = 1;
                 } else {
                     currentJob[commandLen + 1] = NULL;
                 }
@@ -123,6 +130,7 @@ int main() {
                 } else {
                     printf("not waiting\n");
                     fflush(stdout);
+                    history[commandNumber].background = 1;
                     sleep(1);
                 }
             }
@@ -132,5 +140,6 @@ int main() {
     }
     return 0;
 }
+
 #pragma clang diagnostic pop
 
