@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include<stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -7,63 +8,129 @@
 typedef struct jobRec {
     char *jobName;
     char *status;
+    int background;
 };
 
-int splitString(char *jobs, char *input) {
+int splitString(char **jobs, char *input) {
     char *jobToken;
     int commandLen;
     jobToken = strtok(input, " ");
     for (int i = 0; jobToken != NULL; i++) {
         jobs[i] = jobToken;
-        printf("%s\n", jobs[i]);
+//        printf("%s\n", jobs[i]);
         jobToken = strtok(NULL, " ");
         commandLen = i;
     }
     return commandLen;
 }
 
-char *jobs() {
-
+void jobs(struct jobRec history[100], int commandNumber) {
+    for (int i = 0; i < commandNumber; ++i) {
+        if (history[i].background && strcmp(history[i].status, "RUNNING") == 0) {
+            printf("%s\n", history[i].jobName);
+        }
+    }
 }
 
+void historyComm(struct jobRec history[100], int commandNumber) {
+    for (int i = 0; i < commandNumber; ++i) {
+        printf("%s %s\n", history[i].jobName, history[i].status);
+    }
+}
 
+void cd() {}
+
+void exitShell() {
+    exit(0);
+}
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "EndlessLoop"
 int main() {
+    //initialize variables
     int commandNumber = 0;
-    char *jobs[100], *history[100], *path[100], input[100];
+    char *currentJob[100];
     char *builtInFunc[] = {"jobs", "history", "cd", "exit"};
-    int stopLoop = 0, status, commandLen;
+    int status, commandLen;
     pid_t pid;
-    while (!stopLoop) {
+    struct jobRec jobRecord, history[100];
+
+    //shell loop
+    while (1) {
         int builtIn = 0;
+        char input[100];
+        //printing promp
         printf("$ ");
         fflush(stdout);
         //getting command from user
-        scanf("%[^\n]s", input);
+        scanf(" %[^\n]s", input);
         //splitting command into tokens and getting back input len
-        commandLen = splitString(jobs, input);
+        commandLen = splitString(currentJob, input);
+        //setting jobRecord struct
+        jobRecord.jobName = input;
+        jobRecord.status = "RUNNING";
+        jobRecord.background = 0;
+        //insert command into history
+        history[commandNumber] = jobRecord;
         //checking if it is one of the built in functions
         for (int j = 0; j < 4; ++j) {
-            if (strcmp(jobs[0], builtInFunc[j]) == 0) {
+            if (strcmp(currentJob[0], builtInFunc[j]) == 0) {
                 builtIn = 1;
-                if (j == 3) {
-                    stopLoop = 1;
-                    break;
+                switch (j) {
+                    //jumping to case according to the j that entered to the condition
+                    case 0:
+                        jobs(history, commandNumber);
+                    case 1:
+                        historyComm(history, commandNumber);
+                    case 2:
+                        cd();
+                    case 3:
+                        exitShell();
+                    default:
+                        continue;
                 }
             }
         }
+        //if it's not built-in function, call execvp
         if (builtIn == 0) {
             pid = fork();
+            //checking if fork failed
+            if (pid < 0) {
+                printf("fork failed\n");
+                fflush(stdout);
+            }
             if (pid == 0) {
-                //child
-                int v = execvp(jobs[0], jobs);
+                //child - adding null to args for execvp
+                if (strcmp(currentJob[commandLen], "&") == 0) {
+                    currentJob[commandLen] = NULL;
+                    history[commandNumber].background = 1;
+                } else {
+                    currentJob[commandLen + 1] = NULL;
+                }
+                int execStat = execvp(currentJob[0], currentJob);
+                //checking if execvp failed
+                if (execStat == -1) {
+                    printf("exec failed\n");
+                    fflush(stdout);
+                }
             } else {
                 //parent
-                if (strcmp(jobs[commandLen], "&") != 0) {
-                    int wait = waitpid(pid, &status, WNOHANG);
+                //checking if & last char in user input - if it isn't, waiting for child process
+                if (strcmp(currentJob[commandLen], "&") != 0) {
+                    int waited = wait(&status);
+                    printf(" waiting\n");
+                    fflush(stdout);
+                } else {
+                    printf("not waiting\n");
+                    fflush(stdout);
+                    sleep(1);
                 }
             }
         }
+        history[commandNumber].status = "DONE";
+        commandNumber++;
     }
     return 0;
 }
+#pragma clang diagnostic pop
 
