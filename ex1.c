@@ -18,15 +18,42 @@ int splitString(char **currentJob, char *input) {
     char *jobToken;
     int commandLen;
     jobToken = strtok(input, " ");
-    for (int i = 0; jobToken != NULL; i++) {
-        currentJob[i] = jobToken;
-//        printf("%s\n", jobs[i]);
-        jobToken = strtok(NULL, " ");
-        commandLen = i;
+    currentJob[0] = jobToken;
+    if (strcmp(currentJob[0], "echo") == 0) {
+        char c = 34;
+        for (int i = 0; jobToken != NULL; i++) {
+            currentJob[i] = jobToken;
+            jobToken = strtok(NULL, "\"");
+            commandLen = i;
+        }
+    } else {
+        for (int i = 0; jobToken != NULL; i++) {
+            currentJob[i] = jobToken;
+            jobToken = strtok(NULL, " ");
+            commandLen = i;
+        }
     }
+
     return commandLen;
 }
 
+void echoRemover(char *str) {
+    char src[100], dst[100], c = 34;
+    strcpy(src, str);
+    strcpy(dst, str);
+    int i = 0, j = 0;
+    for (; src[i] < "\0"; i++) {
+        dst[j] = src[i];
+        if (dst[i] != c) {
+            j++;
+        }
+    }
+    dst[i] = '\0';
+    strcpy(str, dst);
+}
+
+
+//jobs built-in command implantation
 void jobs(struct jobRec history[100], int commandNumber) {
     for (int i = 0; i <= commandNumber; ++i) {
         if (history[i].background && strcmp(history[i].status, "RUNNING") == 0) {
@@ -35,6 +62,7 @@ void jobs(struct jobRec history[100], int commandNumber) {
     }
 }
 
+//history built-in command implantation
 void historyComm(struct jobRec history[100], int commandNumber) {
     //printing all jobs and status
     for (int i = 0; i <= commandNumber; ++i) {
@@ -42,6 +70,7 @@ void historyComm(struct jobRec history[100], int commandNumber) {
     }
 }
 
+//cd built-in command help function for dealing special cases
 void cdCheck(char *path, char prevPath[100]) {
     char currentDir[100];
     //checking special chars in cd command (~ or -)
@@ -52,13 +81,13 @@ void cdCheck(char *path, char prevPath[100]) {
         //checking if this the only char
         if (strcmp(path, "~") == 0) {
             //changing path to home dir
-            strcpy(path,getenv("HOME"));
+            strcpy(path, getenv("HOME"));
         } else {
             if (getcwd(currentDir, sizeof(currentDir)) == NULL) {
                 printf("An error occurred\n");
             } else {
                 //concreting home dir to path
-                strcpy(currentDir,getenv("HOME"));
+                strcpy(currentDir, getenv("HOME"));
                 strcat(currentDir, ++path);
                 strcpy(--path, currentDir);
 //                printf("%s\n", path);
@@ -67,6 +96,7 @@ void cdCheck(char *path, char prevPath[100]) {
     }
 }
 
+//cd built-in command implantation
 void cd(char *path, int commandLen, char prevPath[100]) {
     char currentDir[100];
     if (getcwd(currentDir, sizeof(currentDir)) == NULL) {
@@ -87,7 +117,7 @@ void cd(char *path, int commandLen, char prevPath[100]) {
     }
 }
 
-
+//exit built-in command implantation
 void exitShell() {
     exit(0);
 }
@@ -110,7 +140,6 @@ int main() {
         printf("$ ");
         fflush(stdout);
         //getting command from user
-        //TODO - dealing with "empty" command
         scanf(" %[^\n]s", input);
         //splitting command into tokens and getting back input len
         commandLen = splitString(currentJob, input);
@@ -144,6 +173,13 @@ int main() {
         }
         //if it's not built-in function, call execvp
         if (builtIn == 0) {
+//            if (strcmp(currentJob[0], "echo") == 0) {
+//                for (int i = 1; i <= commandLen; i++) {
+//                    if (strstr(currentJob[i], "\"")) {
+//                        echoRemover(currentJob[i]);
+//                    }
+//                }
+//            }
             pid = fork();
             //checking if fork failed
             if (pid < 0) {
