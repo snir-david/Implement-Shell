@@ -10,46 +10,57 @@ struct jobRec {
     char jobName[100];
     char *status;
     int background;
-    pid_t pid;
+    pid_t childPid;
 };
+
+//echo function that breaking down for echo command
+int echo(char **currentJob, char *input) {
+    char *dst[100], *jobToken;
+    int i = 0, commandLen = 0;
+    //breaking input into tokens
+    jobToken = strtok(input, " ");
+    for (; jobToken != NULL; i++) {
+        currentJob[i] = jobToken;
+        jobToken = strtok(NULL, "\"");
+        commandLen = i;
+    }
+    //checking for whitespaces in tokens
+    for (int j = 0, k = 0; k < i; k++) {
+        dst[j] = currentJob[k];
+        //checking if cell is whitespace
+        if (strcmp(currentJob[k], " ") != 0) {
+            j++;
+        }
+        commandLen = j - 1;
+    }
+    //putting input without whitespaces
+    for (int j = 0; j < i; j++) {
+        currentJob[j] = dst[j];
+    }
+    return commandLen;
+}
 
 //getting user input and splitting into tokens using whitespace as a delim
 int splitString(char **currentJob, char *input) {
-    char *jobToken;
+    char *dst[100], *jobToken, inputCopy[100];
     int commandLen;
-    jobToken = strtok(input, " ");
+    strcpy(inputCopy, input);
+    //getting command name
+    jobToken = strtok(inputCopy, " ");
     currentJob[0] = jobToken;
+    //checking if it echo command
     if (strcmp(currentJob[0], "echo") == 0) {
-        char c = 34;
-        for (int i = 0; jobToken != NULL; i++) {
-            currentJob[i] = jobToken;
-            jobToken = strtok(NULL, "\"");
-            commandLen = i;
-        }
+        commandLen = echo(currentJob, input);
     } else {
+        //regular command breaking down
+        jobToken = strtok(input, " ");
         for (int i = 0; jobToken != NULL; i++) {
             currentJob[i] = jobToken;
             jobToken = strtok(NULL, " ");
             commandLen = i;
         }
     }
-
     return commandLen;
-}
-
-void echoRemover(char *str) {
-    char src[100], dst[100], c = 34;
-    strcpy(src, str);
-    strcpy(dst, str);
-    int i = 0, j = 0;
-    for (; src[i] < "\0"; i++) {
-        dst[j] = src[i];
-        if (dst[i] != c) {
-            j++;
-        }
-    }
-    dst[i] = '\0';
-    strcpy(str, dst);
 }
 
 
@@ -64,10 +75,18 @@ void jobs(struct jobRec history[100], int commandNumber) {
 
 //history built-in command implantation
 void historyComm(struct jobRec history[100], int commandNumber) {
+    int stat;
     //printing all jobs and status
-    for (int i = 0; i <= commandNumber; ++i) {
+    for (int i = 0; i < commandNumber; ++i) {
+        if (waitpid(history[i].childPid, NULL, WNOHANG) != 0 || history[i].childPid == 0) {
+            history[i].status = "DONE";
+        } else {
+            history[i].status = "RUNNING";
+        }
         printf("%s %s\n", history[i].jobName, history[i].status);
     }
+    printf("%s %s\n", history[commandNumber].jobName, history[commandNumber].status);
+
 }
 
 //cd built-in command help function for dealing special cases
@@ -90,7 +109,6 @@ void cdCheck(char *path, char prevPath[100]) {
                 strcpy(currentDir, getenv("HOME"));
                 strcat(currentDir, ++path);
                 strcpy(--path, currentDir);
-//                printf("%s\n", path);
             }
         }
     }
@@ -111,7 +129,6 @@ void cd(char *path, int commandLen, char prevPath[100]) {
                 printf("chdir failed\n");
             } else {
                 strcpy(prevPath, currentDir);
-//                printf("%s\n", prevPath);
             }
         }
     }
@@ -147,6 +164,7 @@ int main() {
         strcpy(history[commandNumber].jobName, input);
         history[commandNumber].status = "RUNNING";
         history[commandNumber].background = 0;
+        history[commandNumber].childPid = 0;
         //insert command into history
         //checking if it is one of the built in functions
         for (int j = 0; j < 4; ++j) {
@@ -173,22 +191,15 @@ int main() {
         }
         //if it's not built-in function, call execvp
         if (builtIn == 0) {
-//            if (strcmp(currentJob[0], "echo") == 0) {
-//                for (int i = 1; i <= commandLen; i++) {
-//                    if (strstr(currentJob[i], "\"")) {
-//                        echoRemover(currentJob[i]);
-//                    }
-//                }
-//            }
             pid = fork();
             //checking if fork failed
             if (pid < 0) {
                 printf("fork failed\n");
                 fflush(stdout);
             }
+            //getting childPid to struct
+            history[commandNumber].childPid = pid;
             if (pid == 0) {
-                //getting pid to struct
-                history[commandNumber].pid = getpid();
                 //child - adding null to args for execvp
                 if (strcmp(currentJob[commandLen], "&") == 0) {
                     currentJob[commandLen] = NULL;
@@ -206,17 +217,12 @@ int main() {
                 //checking if & last char in user input - if it isn't, waiting for child process
                 if (strcmp(currentJob[commandLen], "&") != 0) {
                     int waited = wait(&status);
-//                    printf(" waiting\n");
-//                    fflush(stdout);
                 } else {
-//                    printf("not waiting\n");
-//                    fflush(stdout);
                     history[commandNumber].background = 1;
                     sleep(1);
                 }
             }
         }
-        history[commandNumber].status = "DONE";
         commandNumber++;
     }
     return 0;
