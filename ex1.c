@@ -1,3 +1,5 @@
+//Snir David Nahari 205686538
+
 #include <stdio.h>
 #include<stdlib.h>
 #include <string.h>
@@ -78,6 +80,7 @@ void historyComm(struct jobRec history[100], int commandNumber) {
     int stat;
     //printing all jobs and status
     for (int i = 0; i < commandNumber; ++i) {
+        //checking which process is running using pid and printing them
         if (waitpid(history[i].childPid, NULL, WNOHANG) != 0 || history[i].childPid == 0) {
             history[i].status = "DONE";
         } else {
@@ -85,6 +88,7 @@ void historyComm(struct jobRec history[100], int commandNumber) {
         }
         printf("%s %s\n", history[i].jobName, history[i].status);
     }
+    //printing last job - history
     printf("%s %s\n", history[commandNumber].jobName, history[commandNumber].status);
 
 }
