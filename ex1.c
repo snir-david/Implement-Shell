@@ -4,6 +4,7 @@
 #include<stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 
 //defining struct for job Record
@@ -64,7 +65,6 @@ int splitString(char **currentJob, char *input) {
     return commandLen;
 }
 
-
 //jobs built-in command implantation
 void jobs(struct jobRec history[100], int commandNumber) {
     for (int i = 0; i < commandNumber; ++i) {
@@ -73,6 +73,7 @@ void jobs(struct jobRec history[100], int commandNumber) {
             history[i].status = "DONE";
         } else {
             history[i].status = "RUNNING";
+            //checking if this process is in background
             if (history[i].background == 1) {
                 printf("%s\n", history[i].jobName);
             }
@@ -226,7 +227,7 @@ int main() {
                 if (strcmp(currentJob[commandLen], "&") != 0) {
                     int waited = wait(&status);
                     //if waited failed
-                    if (waited == -1){
+                    if (waited == -1) {
                         printf("An error occurred\n");
                     }
                 } else {
