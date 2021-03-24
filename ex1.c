@@ -1,10 +1,9 @@
-//Snir David Nahari 205686538
+// Snir David Nahari 205686538
 
 #include <stdio.h>
 #include<stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 
 //defining struct for job Record
@@ -44,7 +43,7 @@ int echo(char **currentJob, char *input) {
 
 //getting user input and splitting into tokens using whitespace as a delim
 int splitString(char **currentJob, char *input) {
-    char *dst[100], *jobToken, inputCopy[100];
+    char *jobToken, inputCopy[100];
     int commandLen;
     strcpy(inputCopy, input);
     //getting command name
@@ -68,16 +67,21 @@ int splitString(char **currentJob, char *input) {
 
 //jobs built-in command implantation
 void jobs(struct jobRec history[100], int commandNumber) {
-    for (int i = 0; i <= commandNumber; ++i) {
-        if (history[i].background && strcmp(history[i].status, "RUNNING") == 0) {
-            printf("%s\n", history[i].jobName);
+    for (int i = 0; i < commandNumber; ++i) {
+        //checking which process is running using pid and printing them
+        if (waitpid(history[i].childPid, NULL, WNOHANG) != 0 || history[i].childPid == 0) {
+            history[i].status = "DONE";
+        } else {
+            history[i].status = "RUNNING";
+            if (history[i].background == 1) {
+                printf("%s\n", history[i].jobName);
+            }
         }
     }
 }
 
 //history built-in command implantation
 void historyComm(struct jobRec history[100], int commandNumber) {
-    int stat;
     //printing all jobs and status
     for (int i = 0; i < commandNumber; ++i) {
         //checking which process is running using pid and printing them
@@ -221,6 +225,10 @@ int main() {
                 //checking if & last char in user input - if it isn't, waiting for child process
                 if (strcmp(currentJob[commandLen], "&") != 0) {
                     int waited = wait(&status);
+                    //if waited failed
+                    if (waited == -1){
+                        printf("An error occurred\n");
+                    }
                 } else {
                     history[commandNumber].background = 1;
                     sleep(1);
