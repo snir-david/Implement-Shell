@@ -250,6 +250,7 @@ int main() {
                         fflush(stdout);
                     }
                 } else {
+                    //replacing full name of history record without "&" char
                     char fullName[100] = {0};
                     for (i = 0; i < commandLen; i++) {
                         strcat(fullName, currentJob[i]);
