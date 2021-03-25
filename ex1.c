@@ -10,6 +10,7 @@
 //defining struct for job Record
 struct jobRec {
     char jobName[100];
+    char jobFullName[100];
     char *status;
     int background;
     pid_t childPid;
@@ -18,7 +19,7 @@ struct jobRec {
 //echo function that breaking down for echo command
 int echo(char **currentJob, char *input) {
     char *dst[100], *jobToken;
-    int i = 0, commandLen = 0;
+    int i = 0, j = 0, k = 0, commandLen = 0;
     //breaking input into tokens
     jobToken = strtok(input, " ");
     for (; jobToken != NULL; i++) {
@@ -27,7 +28,7 @@ int echo(char **currentJob, char *input) {
         commandLen = i;
     }
     //checking for whitespaces in tokens
-    for (int j = 0, k = 0; k < i; k++) {
+    for (; k < i; k++) {
         dst[j] = currentJob[k];
         //checking if cell is whitespace
         if (strcmp(currentJob[k], " ") != 0) {
@@ -36,7 +37,7 @@ int echo(char **currentJob, char *input) {
         commandLen = j - 1;
     }
     //putting input without whitespaces
-    for (int j = 0; j < i; j++) {
+    for (j = 0; j < i; j++) {
         currentJob[j] = dst[j];
     }
     return commandLen;
@@ -45,7 +46,7 @@ int echo(char **currentJob, char *input) {
 //getting user input and splitting into tokens using whitespace as a delim
 int splitString(char **currentJob, char *input) {
     char *jobToken, inputCopy[100];
-    int commandLen;
+    int commandLen, i = 0;
     strcpy(inputCopy, input);
     //getting command name
     jobToken = strtok(inputCopy, " ");
@@ -56,7 +57,7 @@ int splitString(char **currentJob, char *input) {
     } else {
         //regular command breaking down
         jobToken = strtok(input, " ");
-        for (int i = 0; jobToken != NULL; i++) {
+        for (; jobToken != NULL; i++) {
             currentJob[i] = jobToken;
             jobToken = strtok(NULL, " ");
             commandLen = i;
@@ -67,7 +68,8 @@ int splitString(char **currentJob, char *input) {
 
 //jobs built-in command implantation
 void jobs(struct jobRec history[100], int commandNumber) {
-    for (int i = 0; i < commandNumber; ++i) {
+    int i = 0;
+    for (; i < commandNumber; ++i) {
         //checking which process is running using pid and printing them
         if (waitpid(history[i].childPid, NULL, WNOHANG) != 0 || history[i].childPid == 0) {
             history[i].status = "DONE";
@@ -75,7 +77,8 @@ void jobs(struct jobRec history[100], int commandNumber) {
             history[i].status = "RUNNING";
             //checking if this process is in background
             if (history[i].background == 1) {
-                printf("%s\n", history[i].jobName);
+                printf("%s\n", history[i].jobFullName);
+                fflush(stdout);
             }
         }
     }
@@ -84,18 +87,20 @@ void jobs(struct jobRec history[100], int commandNumber) {
 //history built-in command implantation
 void historyComm(struct jobRec history[100], int commandNumber) {
     //printing all jobs and status
-    for (int i = 0; i < commandNumber; ++i) {
+    int i = 0;
+    for (; i < commandNumber; ++i) {
         //checking which process is running using pid and printing them
         if (waitpid(history[i].childPid, NULL, WNOHANG) != 0 || history[i].childPid == 0) {
             history[i].status = "DONE";
         } else {
             history[i].status = "RUNNING";
         }
-        printf("%s %s\n", history[i].jobName, history[i].status);
+        printf("%s %s\n", history[i].jobFullName, history[i].status);
+        fflush(stdout);
     }
     //printing last job - history
-    printf("%s %s\n", history[commandNumber].jobName, history[commandNumber].status);
-
+    printf("%s %s\n", history[commandNumber].jobFullName, history[commandNumber].status);
+    fflush(stdout);
 }
 
 //cd built-in command help function for dealing special cases
@@ -113,6 +118,7 @@ void cdCheck(char *path, char prevPath[100]) {
         } else {
             if (getcwd(currentDir, sizeof(currentDir)) == NULL) {
                 printf("An error occurred\n");
+                fflush(stdout);
             } else {
                 //concreting home dir to path
                 strcpy(currentDir, getenv("HOME"));
@@ -128,14 +134,17 @@ void cd(char *path, int commandLen, char prevPath[100]) {
     char currentDir[100];
     if (getcwd(currentDir, sizeof(currentDir)) == NULL) {
         printf("An error occurred\n");
+        fflush(stdout);
     } else {
         if (commandLen > 1) {
             printf("Too many arguments\n");
+            fflush(stdout);
         } else {
             cdCheck(path, prevPath);
             int cd = chdir(path);
             if (cd == -1) {
                 printf("chdir failed\n");
+                fflush(stdout);
             } else {
                 strcpy(prevPath, currentDir);
             }
@@ -160,23 +169,30 @@ int main() {
 
     //shell loop
     while (1) {
-        int builtIn = 0;
-        char input[100];
+        int builtIn = 0, i = 0, j = 0;
+        char input[100], copyInput[100], specialInput[100];
+
         //printing promp
         printf("$ ");
         fflush(stdout);
         //getting command from user
         scanf(" %[^\n]s", input);
+
+        //making copy of input for later uses
+        strcpy(copyInput, input);
+
+        strcpy(history[commandNumber].jobFullName, input);
         //splitting command into tokens and getting back input len
         commandLen = splitString(currentJob, input);
-        //setting jobRecord struct
+
+        //setting jobRecord struct and insert command into history
         strcpy(history[commandNumber].jobName, input);
         history[commandNumber].status = "RUNNING";
         history[commandNumber].background = 0;
         history[commandNumber].childPid = 0;
-        //insert command into history
+
         //checking if it is one of the built in functions
-        for (int j = 0; j < 4; ++j) {
+        for (; j < 4; ++j) {
             if (strcmp(currentJob[0], builtInFunc[j]) == 0) {
                 builtIn = 1;
                 switch (j) {
@@ -198,6 +214,7 @@ int main() {
                 }
             }
         }
+
         //if it's not built-in function, call execvp
         if (builtIn == 0) {
             pid = fork();
@@ -220,17 +237,27 @@ int main() {
                 if (execStat == -1) {
                     printf("exec failed\n");
                     fflush(stdout);
+                    exitShell();
                 }
             } else {
                 //parent
                 //checking if & last char in user input - if it isn't, waiting for child process
                 if (strcmp(currentJob[commandLen], "&") != 0) {
-                    int waited = wait(&status);
+                    int waited = waitpid(pid, NULL, 0);
                     //if waited failed
                     if (waited == -1) {
                         printf("An error occurred\n");
+                        fflush(stdout);
                     }
                 } else {
+                    char fullName[100] = {0};
+                    for (i = 0; i < commandLen; i++) {
+                        strcat(fullName, currentJob[i]);
+                        if ( i < commandLen -1) {
+                            strcat(fullName, " ");
+                        }
+                    }
+                    strcpy(history[commandNumber].jobFullName, fullName);
                     history[commandNumber].background = 1;
                     sleep(1);
                 }
