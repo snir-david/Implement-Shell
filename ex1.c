@@ -136,7 +136,15 @@ void cd(char *path, int commandLen, char prevPath[100]) {
         printf("An error occurred\n");
         fflush(stdout);
     } else {
-        if (commandLen > 1) {
+        if(commandLen == 0) {
+            int cd = chdir(getenv("HOME"));
+            if (cd == -1) {
+                printf("chdir failed\n");
+                fflush(stdout);
+            } else {
+                strcpy(prevPath, currentDir);
+            }
+        } else if (commandLen > 1) {
             printf("Too many arguments\n");
             fflush(stdout);
         } else {
@@ -260,7 +268,6 @@ int main() {
                     }
                     strcpy(history[commandNumber].jobFullName, fullName);
                     history[commandNumber].background = 1;
-                    sleep(1);
                 }
             }
         }
